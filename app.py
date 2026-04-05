@@ -9,8 +9,9 @@ def hello():
 
 @app.route("/callback", methods=["POST"])
 def callback():
+    print("Webhook来た！！！")
     data = request.json
-    print("受信データ:", data)
+    print(data)
     return "OK"
 
 if __name__ == "__main__":
