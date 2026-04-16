@@ -21,6 +21,9 @@ SHEET_NAMES: dict[str, str] = {
     "price_table_items": "price_table_items",
     "templates": "templates",
     "test_cases": "test_cases",
+    "intent_keywords": "intent_keywords",
+    "intent_templates": "intent_templates",
+    "intent_routing": "intent_routing",
 }
 
 MANUAL_REPLY_STORAGE_FILE = os.environ.get(

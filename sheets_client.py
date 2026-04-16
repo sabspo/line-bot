@@ -19,7 +19,7 @@ SCOPES = [
 
 
 class SheetsClientError(RuntimeError):
-    """Google Sheets 読み込み失敗を表す例外。"""
+    """Google Sheets 読み込み時のエラー。"""
 
 
 def _build_client(service_account_file: str = SERVICE_ACCOUNT_FILE) -> gspread.Client:
@@ -40,10 +40,10 @@ def _build_client(service_account_file: str = SERVICE_ACCOUNT_FILE) -> gspread.C
         return gspread.service_account(filename=str(account_path), scopes=SCOPES)
     except json.JSONDecodeError as exc:
         raise SheetsClientError("SERVICE_ACCOUNT_JSON の JSON 解析に失敗しました。") from exc
+    except SheetsClientError:
+        raise
     except (OSError, GoogleAuthError, Exception) as exc:
-        raise SheetsClientError(
-            f"サービスアカウント認証に失敗しました: {exc}"
-        ) from exc
+        raise SheetsClientError(f"サービスアカウント認証に失敗しました: {exc}") from exc
 
 
 def _open_worksheet(sheet_name: str) -> gspread.Worksheet:
@@ -58,9 +58,7 @@ def _open_worksheet(sheet_name: str) -> gspread.Worksheet:
             f"シート '{sheet_name}' が見つかりません。SHEET_NAMES を確認してください。"
         ) from exc
     except Exception as exc:
-        raise SheetsClientError(
-            f"スプレッドシートのオープンに失敗しました: {exc}"
-        ) from exc
+        raise SheetsClientError(f"スプレッドシートのオープンに失敗しました: {exc}") from exc
 
 
 def _normalize_header(header: str) -> str:
@@ -108,3 +106,15 @@ def load_template_rows() -> list[dict[str, str]]:
 
 def load_test_case_rows() -> list[dict[str, str]]:
     return _load_sheet_rows(SHEET_NAMES["test_cases"])
+
+
+def load_intent_keyword_rows() -> list[dict[str, str]]:
+    return _load_sheet_rows(SHEET_NAMES["intent_keywords"])
+
+
+def load_intent_template_rows() -> list[dict[str, str]]:
+    return _load_sheet_rows(SHEET_NAMES["intent_templates"])
+
+
+def load_intent_routing_rows() -> list[dict[str, str]]:
+    return _load_sheet_rows(SHEET_NAMES["intent_routing"])
