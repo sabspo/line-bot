@@ -38,5 +38,6 @@ class ReplyDecision:
     team_id: str | None
     team_name: str
     template_id: str
+    intent: str
     manual_required: bool
     reason: str
