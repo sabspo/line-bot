@@ -31,6 +31,11 @@ MANUAL_REPLY_STORAGE_FILE = os.environ.get(
     str(Path(__file__).resolve().parent / "data" / "pending_manual_replies.db"),
 )
 
+AUTO_REPLY_LOG_DB_FILE = os.environ.get(
+    "AUTO_REPLY_LOG_DB_FILE",
+    str(Path(__file__).resolve().parent / "data" / "auto_reply_logs.db"),
+)
+
 MANUAL_REPLY_ADMIN_TOKEN = os.environ.get("MANUAL_REPLY_ADMIN_TOKEN", "")
 MANUAL_REPLY_ADMIN_USERNAME = os.environ.get("MANUAL_REPLY_ADMIN_USERNAME", "")
 MANUAL_REPLY_ADMIN_PASSWORD = os.environ.get("MANUAL_REPLY_ADMIN_PASSWORD", "")

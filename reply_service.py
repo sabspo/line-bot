@@ -163,6 +163,13 @@ def find_team_id(message: str, aliases: list[dict[str, Any]]) -> str | None:
     return matches[0][1]
 
 
+def _find_team_id_from_text(text: str, teams: list[dict[str, Any]], aliases: list[dict[str, Any]]) -> str | None:
+    normalized_text = normalize_text(text)
+    if not normalized_text:
+        return None
+    return find_team_id(text, aliases) or _find_team_id_by_team_name(text, teams)
+
+
 def _find_team_id_by_team_name(message: str, teams: list[dict[str, Any]]) -> str | None:
     normalized_message = normalize_text(message)
     matches: list[tuple[int, str]] = []
@@ -443,17 +450,43 @@ def _resolve_team_context(
     message: str,
     teams: list[dict[str, Any]],
     aliases: list[dict[str, Any]],
+    *,
+    sender_name: str = "",
+    sender_tag: str = "",
 ) -> tuple[str | None, dict[str, Any] | None]:
-    team_id = find_team_id(message, aliases) or _find_team_id_by_team_name(message, teams)
+    candidate_texts = (
+        sender_name,
+        sender_tag,
+        message,
+    )
+    team_id = None
+    for text in candidate_texts:
+        team_id = _find_team_id_from_text(text, teams, aliases)
+        if team_id:
+            break
     team = get_team(team_id, teams) if team_id else None
     return team_id, team
 
 
-def generate_reply(message: str) -> str:
-    return generate_reply_decision(message).reply_text
+def generate_reply(
+    message: str,
+    *,
+    sender_name: str = "",
+    sender_tag: str = "",
+) -> str:
+    return generate_reply_decision(
+        message,
+        sender_name=sender_name,
+        sender_tag=sender_tag,
+    ).reply_text
 
 
-def generate_reply_decision(message: str) -> ReplyDecision:
+def generate_reply_decision(
+    message: str,
+    *,
+    sender_name: str = "",
+    sender_tag: str = "",
+) -> ReplyDecision:
     try:
         teams = load_team_rows()
         aliases = load_alias_rows()
@@ -464,7 +497,13 @@ def generate_reply_decision(message: str) -> ReplyDecision:
         intent_routings = load_intent_routing_rows()
 
         intent_id = detect_intent(message, intent_keywords)
-        team_id, team = _resolve_team_context(message, teams, aliases)
+        team_id, team = _resolve_team_context(
+            message,
+            teams,
+            aliases,
+            sender_name=sender_name,
+            sender_tag=sender_tag,
+        )
         team_name = _get_team_name(team) if team else ""
         routing = get_intent_routing(intent_id, intent_routings)
 

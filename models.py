@@ -41,3 +41,19 @@ class ReplyDecision:
     intent: str
     manual_required: bool
     reason: str
+
+
+@dataclass(slots=True)
+class AutoReplyLog:
+    created_at: str
+    user_id: str
+    sender_name: str
+    sender_tag: str
+    message_text: str
+    intent: str
+    team_id: str | None
+    team_name: str
+    template_id: str
+    manual_required: bool
+    reason: str
+    reply_text: str

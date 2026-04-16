@@ -3,11 +3,16 @@ from __future__ import annotations
 from pathlib import Path
 
 import app as app_module
+from auto_reply_log_store import AutoReplyLogStore
 from manual_reply_store import ManualReplyStore, PendingManualReply
 
 
 def _build_store(tmp_path: Path) -> ManualReplyStore:
-    return ManualReplyStore(str(tmp_path / "pending_manual_replies.json"))
+    return ManualReplyStore(str(tmp_path / "pending_manual_replies.db"))
+
+
+def _build_log_store(tmp_path: Path) -> AutoReplyLogStore:
+    return AutoReplyLogStore(str(tmp_path / "auto_reply_logs.db"))
 
 
 def test_list_manual_replies_requires_token(tmp_path: Path, monkeypatch) -> None:
@@ -47,6 +52,36 @@ def test_list_manual_replies_returns_pending_rows(tmp_path: Path, monkeypatch) -
     assert payload[0]["request_id"] == "req-003"
 
 
+def test_auto_reply_logs_endpoint_returns_rows(tmp_path: Path, monkeypatch) -> None:
+    log_store = _build_log_store(tmp_path)
+    log_store.insert(
+        app_module.AutoReplyLog(
+            created_at="2026-04-16T00:00:00+00:00",
+            user_id="user-001",
+            sender_name="つくしヤングラガーズ小学部",
+            sender_tag="小学部保護者",
+            message_text="価格を教えてください",
+            intent="price_inquiry",
+            team_id="TEAM-001",
+            team_name="つくしヤングラガーズ小学部",
+            template_id="TMP-001",
+            manual_required=False,
+            reason="auto_price_list",
+            reply_text="価格一覧です",
+        )
+    )
+    monkeypatch.setattr(app_module, "MANUAL_REPLY_ADMIN_TOKEN", "secret-token")
+    monkeypatch.setattr(app_module, "auto_reply_log_store", log_store)
+    client = app_module.app.test_client()
+
+    response = client.get("/auto-reply-logs", headers={"X-Admin-Token": "secret-token"})
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert len(payload) == 1
+    assert payload[0]["sender_name"] == "つくしヤングラガーズ小学部"
+
+
 def test_manual_replies_ui_renders_pending_rows(tmp_path: Path, monkeypatch) -> None:
     store = _build_store(tmp_path)
     store.enqueue(
@@ -81,7 +116,7 @@ def test_send_manual_reply_marks_request_replied(tmp_path: Path, monkeypatch) ->
         PendingManualReply(
             request_id="req-005",
             user_id="user-005",
-            message_text="人が確認してください",
+            message_text="人で確認してください",
             reply_token="token-005",
             team_id=None,
             team_name="",
@@ -104,11 +139,11 @@ def test_send_manual_reply_marks_request_replied(tmp_path: Path, monkeypatch) ->
     response = client.post(
         "/manual-replies/req-005/reply",
         headers={"X-Admin-Token": "secret-token"},
-        json={"user_id": "user-005", "message_text": "担当者が折り返します。"},
+        json={"user_id": "user-005", "message_text": "担当より確認してご連絡します。"},
     )
 
     assert response.status_code == 200
-    assert sent_messages == [("user-005", "担当者が折り返します。")]
+    assert sent_messages == [("user-005", "担当より確認してご連絡します。")]
     payload = response.get_json()
     assert payload["status"] == "replied"
 
@@ -127,11 +162,13 @@ def test_list_manual_replies_requires_basic_auth_when_enabled(tmp_path: Path, mo
 
 def test_handle_message_queues_manual_reply_only_once(tmp_path: Path, monkeypatch) -> None:
     store = _build_store(tmp_path)
+    log_store = _build_log_store(tmp_path)
     monkeypatch.setattr(app_module, "manual_reply_store", store)
+    monkeypatch.setattr(app_module, "auto_reply_log_store", log_store)
     monkeypatch.setattr(
         app_module,
         "generate_reply_decision",
-        lambda _message: type(
+        lambda _message, **_kwargs: type(
             "Decision",
             (),
             {
@@ -139,6 +176,7 @@ def test_handle_message_queues_manual_reply_only_once(tmp_path: Path, monkeypatc
                 "team_id": None,
                 "team_name": "",
                 "template_id": "TMP-002",
+                "intent": "price_inquiry",
                 "manual_required": True,
                 "reason": "team_not_found",
             },
@@ -160,6 +198,13 @@ def test_handle_message_queues_manual_reply_only_once(tmp_path: Path, monkeypatc
         def __init__(self, _api_client):
             pass
 
+        def get_profile(self, *, user_id: str):
+            return type(
+                "Profile",
+                (),
+                {"displayName": "つくしヤングラガーズ小学部", "statusMessage": "保護者代表"},
+            )()
+
         def reply_message(self, request):
             sent_replies.append(request.messages[0].text)
 
@@ -174,7 +219,7 @@ def test_handle_message_queues_manual_reply_only_once(tmp_path: Path, monkeypatc
         {
             "message": type("Message", (), {"text": "手動対応してください"})(),
             "reply_token": "dup-token",
-            "source": type("Source", (), {"user_id": "user-dup"})(),
+            "source": type("Source", (), {"user_id": "user-dup", "type": "user"})(),
         },
     )()
 
@@ -183,3 +228,6 @@ def test_handle_message_queues_manual_reply_only_once(tmp_path: Path, monkeypatc
 
     assert len(store.list_pending()) == 1
     assert len(sent_replies) == 2
+    logs = log_store.list_recent()
+    assert len(logs) == 2
+    assert logs[0]["sender_name"] == "つくしヤングラガーズ小学部"

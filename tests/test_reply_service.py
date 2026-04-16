@@ -342,6 +342,80 @@ def test_generate_reply_falls_back_to_team_name_when_alias_is_missing(monkeypatc
     assert "・チームソックス：税込1,470円" in reply
 
 
+def test_generate_reply_prefers_sender_name_over_message(monkeypatch) -> None:
+    _patch_data(
+        monkeypatch,
+        aliases=[
+            {"team_id": "TEAM-001", "alias_name": "つくしヤング"},
+            {"team_id": "TEAM-002", "alias_name": "みどりラグビー"},
+        ],
+        teams=[
+            {"team_id": "TEAM-001", "team_name": "つくしヤングラガーズ小学部", "status": "有効", "price_table_id": "PT-001"},
+            {"team_id": "TEAM-002", "team_name": "みどりラグビークラブ", "status": "有効", "price_table_id": "PT-002"},
+        ],
+        items=[
+            {
+                "team_id": "TEAM-001",
+                "reply_line": "チームTシャツ：税込3,170円",
+                "自動応答対象": "対象",
+                "確認ステータス": "OK",
+            },
+            {
+                "team_id": "TEAM-002",
+                "reply_line": "練習シャツ：税込2,900円",
+                "自動応答対象": "対象",
+                "確認ステータス": "OK",
+            },
+        ],
+    )
+
+    reply = reply_service.generate_reply(
+        "みどりラグビーの価格を教えてください。",
+        sender_name="つくしヤングラガーズ小学部",
+    )
+
+    assert "つくしヤングラガーズ小学部" in reply
+    assert "・チームTシャツ：税込3,170円" in reply
+    assert "練習シャツ" not in reply
+
+
+def test_generate_reply_prefers_sender_tag_over_message(monkeypatch) -> None:
+    _patch_data(
+        monkeypatch,
+        aliases=[
+            {"team_id": "TEAM-001", "alias_name": "つくしヤング"},
+            {"team_id": "TEAM-002", "alias_name": "みどりラグビー"},
+        ],
+        teams=[
+            {"team_id": "TEAM-001", "team_name": "つくしヤングラガーズ小学部", "status": "有効", "price_table_id": "PT-001"},
+            {"team_id": "TEAM-002", "team_name": "みどりラグビークラブ", "status": "有効", "price_table_id": "PT-002"},
+        ],
+        items=[
+            {
+                "team_id": "TEAM-001",
+                "reply_line": "チームソックス：税込1,470円",
+                "自動応答対象": "対象",
+                "確認ステータス": "OK",
+            },
+            {
+                "team_id": "TEAM-002",
+                "reply_line": "練習パンツ：税込2,200円",
+                "自動応答対象": "対象",
+                "確認ステータス": "OK",
+            },
+        ],
+    )
+
+    reply = reply_service.generate_reply(
+        "みどりラグビーの価格を教えてください。",
+        sender_tag="つくしヤング",
+    )
+
+    assert "つくしヤングラガーズ小学部" in reply
+    assert "・チームソックス：税込1,470円" in reply
+    assert "練習パンツ" not in reply
+
+
 def test_generate_reply_decision_marks_team_not_found_for_manual_reply(monkeypatch) -> None:
     _patch_data(monkeypatch)
 
